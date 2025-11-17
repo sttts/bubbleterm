@@ -73,6 +73,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     return m, cmd
 }
 
+func (m *model) View() tea.View {
+    return m.terminal.View()
+}
+
 func userShell() string {
     if sh := os.Getenv("SHELL"); sh != "" {
         return sh
@@ -186,7 +190,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     return m, cmd
 }
 
-func (m *model) View() string {
+func (m *model) View() tea.View {
     return m.terminal.View()
 }
 ```

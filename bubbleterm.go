@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea/v2"
+	tea "charm.land/bubbletea/v2"
 	"github.com/taigrr/bubbleterm/emulator"
 )
 
@@ -183,13 +183,13 @@ func (m *Model) UpdateTerminal() tea.Cmd {
 }
 
 // View renders the terminal output
-func (m *Model) View() string {
+func (m *Model) View() tea.View {
 	if m.err != nil {
-		return "Terminal error: " + m.err.Error()
+		return tea.NewView("Terminal error: " + m.err.Error())
 	}
 
 	// Return cached view for maximum performance
-	return m.cachedView
+	return tea.NewView(m.cachedView)
 }
 
 // Focus sets the bubble as focused (receives keyboard input)
