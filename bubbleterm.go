@@ -3,6 +3,7 @@ package bubbleterm
 import (
 	"os/exec"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/taigrr/bubbleterm/emulator"
@@ -17,14 +18,15 @@ type translatedMouseMsg struct {
 
 // Model represents the terminal bubble state
 type Model struct {
-	emulator   *emulator.Emulator
-	width      int
-	height     int
-	focused    bool
-	err        error
-	frame      emulator.EmittedFrame
-	cachedView string // Cache the rendered view string
-	autoPoll   bool   // Whether to automatically poll for updates
+	emulator     *emulator.Emulator
+	width        int
+	height       int
+	focused      bool
+	err          error
+	frame        emulator.EmittedFrame
+	cachedView   string // Cache the rendered view string
+	autoPoll     bool   // Whether to automatically poll for updates
+	pollInterval time.Duration
 }
 
 // New creates a new terminal bubble with the specified dimensions
@@ -35,18 +37,27 @@ func New(width, height int) (*Model, error) {
 	}
 
 	return &Model{
-		emulator:   emu,
-		width:      width,
-		height:     height,
-		focused:    true,
-		frame:      emulator.EmittedFrame{Rows: make([]string, height)},
-		cachedView: strings.Repeat("\n", height-1), // Initialize with empty lines
-		autoPoll:   true,
+		emulator:     emu,
+		width:        width,
+		height:       height,
+		focused:      true,
+		frame:        emulator.EmittedFrame{Rows: make([]string, height)},
+		cachedView:   strings.Repeat("\n", height-1), // Initialize with empty lines
+		autoPoll:     true,
+		pollInterval: emu.FrameInterval(),
 	}, nil
 }
 
 func (m *Model) SetAutoPoll(autoPoll bool) {
 	m.autoPoll = autoPoll
+}
+
+// SetPollInterval configures how frequently autopolling occurs when the screen is idle
+func (m *Model) SetPollInterval(interval time.Duration) {
+	if interval <= 0 {
+		return
+	}
+	m.pollInterval = interval
 }
 
 // NewWithCommand creates a new terminal bubble and starts the specified command
@@ -136,21 +147,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.EmulatorID != m.emulator.ID() {
 			return m, nil // Ignore messages from other emulators
 		}
-		if len(msg.Frame.Damage) == 0 {
-			if m.autoPoll {
-				return m, pollTerminal(m.emulator)
-			}
-			return m, nil
+		hasDamage := len(msg.Frame.Damage) > 0
+		if hasDamage {
+			// Update the frame with new terminal output
+			m.frame = msg.Frame
+			// Cache the rendered view for fast access
+			m.cachedView = strings.Join(m.frame.Rows, "\n")
 		}
-		// Update the frame with new terminal output
-		m.frame = msg.Frame
-		// Cache the rendered view for fast access
-		m.cachedView = strings.Join(m.frame.Rows, "\n")
-		// Don't immediately poll again - let the tick handle regular polling
-		if m.autoPoll {
-			return m, pollTerminal(m.emulator)
-		}
-		return m, nil
+		return m, m.nextPollCmd(hasDamage)
 
 	case terminalErrorMsg:
 		if msg.EmulatorID != m.emulator.ID() {
@@ -233,4 +237,15 @@ func (m *Model) Close() error {
 		return m.emulator.Close()
 	}
 	return nil
+}
+
+func (m *Model) nextPollCmd(hasDamage bool) tea.Cmd {
+	if !m.autoPoll {
+		return nil
+	}
+	delay := time.Duration(0)
+	if !hasDamage {
+		delay = m.pollInterval
+	}
+	return pollTerminalWithDelay(m.emulator, delay)
 }

@@ -203,6 +203,9 @@ if terminal.GetEmulator().IsProcessExited() {
 // Auto-polling control (for custom update loops)
 terminal.SetAutoPoll(false)
 cmd := terminal.UpdateTerminal() // Manual poll
+
+// Adjust how frequently idle polling occurs (default matches emulator frame interval)
+terminal.SetPollInterval(100 * time.Millisecond)
 ```
 
 ### Damage Tracking
@@ -217,6 +220,8 @@ for _, dmg := range frame.Damage {
 ```
 
 This makes it easy to refresh only the lines that actually changed when compositing multiple terminal views. The default Bubble Tea integration automatically skips re-rendering frames when there are no damage entries, preventing redundant work.
+
+Auto-polling continues even when no damage is detected; Bubbleterm schedules the next poll after the configured interval, so you don't have to send manual events to keep PTY output flowing.
 
 ## Limitations and Known Issues
 

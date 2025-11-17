@@ -2,6 +2,7 @@ package bubbleterm
 
 import (
 	"os/exec"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/taigrr/bubbleterm/emulator"
@@ -39,6 +40,15 @@ func pollTerminal(emu *emulator.Emulator) tea.Cmd {
 		frame := emu.GetScreen()
 		return terminalOutputMsg{Frame: frame, EmulatorID: emu.ID()}
 	}
+}
+
+func pollTerminalWithDelay(emu *emulator.Emulator, delay time.Duration) tea.Cmd {
+	if delay <= 0 {
+		return pollTerminal(emu)
+	}
+	return tea.Tick(delay, func(time.Time) tea.Msg {
+		return pollTerminal(emu)()
+	})
 }
 
 // sendInput sends input to the terminal

@@ -121,6 +121,13 @@ func (e *Emulator) SetFrameRate(fps int) {
 	e.frameRate = time.Second / time.Duration(fps)
 }
 
+// FrameInterval returns the current frame interval used for polling/rendering
+func (e *Emulator) FrameInterval() time.Duration {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.frameRate
+}
+
 // GetScreen returns the current rendered screen as ANSI strings
 func (e *Emulator) GetScreen() EmittedFrame {
 	e.mu.Lock()
