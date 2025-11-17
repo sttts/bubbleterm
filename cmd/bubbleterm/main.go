@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"os"
 	"os/exec"
+	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/taigrr/bubbleterm"
@@ -14,8 +16,8 @@ type model struct {
 }
 
 func main() {
-	// Create a new terminal bubble and start htop
-	cmd := exec.Command("htop")
+	// Create a new terminal bubble and start the user's shell
+	cmd := exec.Command(defaultShell())
 	terminal, err := bubbleterm.NewWithCommand(80, 24, cmd)
 	if err != nil {
 		log.Fatal(err)
@@ -61,4 +63,17 @@ func (m *model) View() string {
 	}
 
 	return m.terminal.View()
+}
+
+func defaultShell() string {
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return shell
+	}
+	if runtime.GOOS == "windows" {
+		if shell := os.Getenv("COMSPEC"); shell != "" {
+			return shell
+		}
+		return "cmd.exe"
+	}
+	return "/bin/sh"
 }

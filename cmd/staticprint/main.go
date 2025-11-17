@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/taigrr/bubbleterm/emulator"
@@ -17,8 +19,8 @@ func main() {
 	}
 	defer emu.Close()
 
-	// Start a simple command
-	cmd := exec.Command("htop")
+	// Start the user's shell so you can try any command
+	cmd := exec.Command(defaultShell())
 	err = emu.StartCommand(cmd)
 	if err != nil {
 		log.Fatal(err)
@@ -44,4 +46,17 @@ func main() {
 	for i, row := range frame.Rows {
 		fmt.Printf("%2d: %s\n", i, row)
 	}
+}
+
+func defaultShell() string {
+	if shell := os.Getenv("SHELL"); shell != "" {
+		return shell
+	}
+	if runtime.GOOS == "windows" {
+		if shell := os.Getenv("COMSPEC"); shell != "" {
+			return shell
+		}
+		return "cmd.exe"
+	}
+	return "/bin/sh"
 }

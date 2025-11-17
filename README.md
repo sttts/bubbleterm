@@ -54,15 +54,15 @@ go run cmd/bubbleterm/main.go
 
 This example shows how to:
 
-- Create a terminal bubble that runs `htop`
+- Create a terminal bubble that launches your `$SHELL`
 - Handle keyboard input (Ctrl+C/q to quit)
 - Forward all messages to the terminal bubble
 - Display the terminal output in a TUI
 
 ```go
 // import bubbleterm "github.com/taigrr/bubbleterm"
-// Create a new terminal bubble and start htop
-cmd := exec.Command("htop")
+// Create a new terminal bubble and start the user's shell
+cmd := exec.Command(userShell())
 terminal, err := bubbleterm.NewWithCommand(80, 24, cmd)
 
 // Use in your Bubbletea model
@@ -71,6 +71,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     terminalModel, cmd := m.terminal.Update(msg)
     m.terminal = terminalModel.(*bubbleterm.Model)
     return m, cmd
+}
+
+func userShell() string {
+    if sh := os.Getenv("SHELL"); sh != "" {
+        return sh
+    }
+    return "/bin/sh"
 }
 ```
 
@@ -85,7 +92,7 @@ go run cmd/staticprint/main.go
 This example demonstrates:
 
 - Creating a headless terminal emulator
-- Starting a command (`htop`)
+- Starting your shell so you can run any command
 - Capturing terminal output as frames
 - Resizing the terminal dynamically
 
@@ -95,7 +102,7 @@ emu, err := emulator.New(80, 24)
 defer emu.Close()
 
 // Start a command
-cmd := exec.Command("htop")
+cmd := exec.Command(userShell())
 err = emu.StartCommand(cmd)
 
 // Get the screen output
