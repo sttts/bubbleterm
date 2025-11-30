@@ -2,6 +2,7 @@ package bubbleterm
 
 import (
 	"os/exec"
+	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -56,6 +57,16 @@ func sendInput(emu *emulator.Emulator, input string) tea.Cmd {
 	return func() tea.Msg {
 		err := emu.SendKey(input)
 		if err != nil {
+			return terminalErrorMsg{Err: err, EmulatorID: emu.ID()}
+		}
+		return nil
+	}
+}
+
+// sendSignal forwards a signal to the running process.
+func sendSignal(emu *emulator.Emulator, sig syscall.Signal) tea.Cmd {
+	return func() tea.Msg {
+		if err := emu.SendSignal(sig); err != nil {
 			return terminalErrorMsg{Err: err, EmulatorID: emu.ID()}
 		}
 		return nil

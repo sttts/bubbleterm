@@ -10,7 +10,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/google/uuid"
-	"golang.org/x/term"
+	"golang.org/x/sys/unix"
 )
 
 // Emulator is a headless terminal emulator that maintains internal state
@@ -42,7 +42,7 @@ type Emulator struct {
 	viewInts    []int
 	viewStrings []string
 
-	ttyState *term.State
+	ttyState *unix.Termios
 }
 
 // EmittedFrame represents a rendered frame from the terminal
@@ -71,11 +71,9 @@ func New(cols, rows int) (*Emulator, error) {
 		return nil, err
 	}
 
-	state, err := term.MakeRaw(int(e.pty.Fd()))
-	if err != nil {
-		return nil, fmt.Errorf("set PTY raw mode: %w", err)
+	if err := e.enableSignals(); err != nil {
+		return nil, fmt.Errorf("configure PTY signals: %w", err)
 	}
-	e.ttyState = state
 
 	// Set initial size
 	err = e.resize(cols, rows)
@@ -91,6 +89,27 @@ func New(cols, rows int) (*Emulator, error) {
 
 func (e *Emulator) ID() string {
 	return e.id
+}
+
+func (e *Emulator) enableSignals() error {
+	reqGet, reqSet := termiosRequests()
+	orig, err := unix.IoctlGetTermios(int(e.tty.Fd()), reqGet)
+	if err != nil {
+		return fmt.Errorf("get termios: %w", err)
+	}
+
+	e.ttyState = orig
+
+	t := *orig
+	t.Lflag |= unix.ISIG
+	if t.Lflag&unix.ICANON == 0 {
+		t.Lflag |= unix.ICANON
+	}
+
+	if err := unix.IoctlSetTermios(int(e.tty.Fd()), reqSet, &t); err != nil {
+		return fmt.Errorf("set termios: %w", err)
+	}
+	return nil
 }
 
 // SetSize sets the terminal size (same as Resize for now)
@@ -292,6 +311,30 @@ func (e *Emulator) SendKey(key string) error {
 	return err
 }
 
+// SendSignal forwards a POSIX signal to the child process and its process group.
+// It prefers the process group to ensure shells and their children receive it,
+// falling back to the direct process if the group is unavailable.
+func (e *Emulator) SendSignal(sig syscall.Signal) error {
+	e.mu.RLock()
+	cmd := e.cmd
+	exited := e.processExited
+	e.mu.RUnlock()
+
+	if cmd == nil {
+		return ErrProcessNotStarted
+	}
+	if exited {
+		return ErrProcessExited
+	}
+
+	pid := cmd.Process.Pid
+	if err := syscall.Kill(-pid, sig); err == nil {
+		return nil
+	}
+
+	return cmd.Process.Signal(sig)
+}
+
 // SendMouse sends a mouse event to the terminal in SGR format
 func (e *Emulator) SendMouse(button int, x, y int, pressed bool) error {
 	e.mu.RLock()
@@ -374,8 +417,9 @@ func (e *Emulator) SendMouse(button int, x, y int, pressed bool) error {
 func (e *Emulator) Close() error {
 	close(e.stopChan)
 
-	if e.pty != nil && e.ttyState != nil {
-		term.Restore(int(e.pty.Fd()), e.ttyState)
+	if e.tty != nil && e.ttyState != nil {
+		_, reqSet := termiosRequests()
+		_ = unix.IoctlSetTermios(int(e.tty.Fd()), reqSet, e.ttyState)
 	}
 	if e.tty != nil {
 		e.tty.Close()
