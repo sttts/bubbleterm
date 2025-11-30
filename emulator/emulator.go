@@ -31,6 +31,7 @@ type Emulator struct {
 	cmd           *exec.Cmd
 	processExited bool
 	onExit        func(string) // Callback when process exits, receives emulator ID
+	quietExit     bool         // Suppress exit logs when true
 
 	// Framerate control
 	frameRate time.Duration
@@ -171,6 +172,13 @@ func (e *Emulator) SetOnExit(callback func(string)) {
 	e.onExit = callback
 }
 
+// SetQuietExit toggles printing process exit messages.
+func (e *Emulator) SetQuietExit(quiet bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.quietExit = quiet
+}
+
 // IsProcessExited returns true if the process has exited
 func (e *Emulator) IsProcessExited() bool {
 	e.mu.RLock()
@@ -246,11 +254,16 @@ func (e *Emulator) monitorProcess() {
 	e.processExited = true
 	onExit := e.onExit
 	id := e.id
+	quiet := e.quietExit
 	e.mu.Unlock()
 
 	// Call the exit callback if set
 	if onExit != nil {
 		onExit(id)
+	}
+
+	if quiet {
+		return
 	}
 
 	// Log the exit for debugging

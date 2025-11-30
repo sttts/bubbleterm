@@ -233,6 +233,12 @@ func (m *Model) Resize(width, height int) tea.Cmd {
 	return resizeTerminal(m.emulator, width, height)
 }
 
+// SetQuietExit suppresses process exit messages emitted by the underlying emulator.
+// When set to true, the emulator will not print to stdout/stderr when a process exits.
+func (m *Model) SetQuietExit(quiet bool) {
+	m.emulator.SetQuietExit(quiet)
+}
+
 // GetEmulator returns the underlying emulator (for process monitoring)
 func (m *Model) GetEmulator() *emulator.Emulator {
 	return m.emulator
